@@ -860,4 +860,276 @@ Gostaria de solicitar outro galão agora?
 
 Responda SIM para confirmar seu pedido! 😊`;
 
-                const phone = client.phone.
+                const phone = client.phone.replace(/[^0-9]/g, '');
+                const encodedMessage = encodeURIComponent(message);
+                const whatsappUrl = `https://wa.me/${phone}?text=${encodedMessage}`;
+
+                window.open(whatsappUrl, '_blank');
+                console.log('✅ WhatsApp aberto para:', client.name);
+            } catch (error) {
+                console.error('Erro ao abrir WhatsApp:', error);
+                alert('❌ Erro ao abrir WhatsApp. Verifique o número do telefone.');
+            }
+        }
+
+        // ==========================================
+        // FUNÇÕES DE INTERFACE
+        // ==========================================
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tab).classList.add('active');
+        }
+
+        function changePeriod(period) {
+            currentPeriod = period;
+            document.querySelectorAll('.period-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            updateFinanceUI();
+        }
+
+        function getPeriodDates(period) {
+            const now = new Date();
+            const start = new Date(now);
+
+            switch (period) {
+                case 'day':
+                    start.setHours(0, 0, 0, 0);
+                    break;
+                case 'week':
+                    start.setDate(now.getDate() - 7);
+                    break;
+                case 'month':
+                    start.setMonth(now.getMonth() - 1);
+                    break;
+                case 'bimonthly':
+                    start.setMonth(now.getMonth() - 2);
+                    break;
+                case 'quarter':
+                    start.setMonth(now.getMonth() - 3);
+                    break;
+                case 'semester':
+                    start.setMonth(now.getMonth() - 6);
+                    break;
+                case 'year':
+                    start.setFullYear(now.getFullYear() - 1);
+                    break;
+            }
+
+            return { start, end: now };
+        }
+
+        function filterTransactionsByPeriod(period) {
+            const { start, end } = getPeriodDates(period);
+            return transactions.filter(t => {
+                const tDate = new Date(t.date);
+                return tDate >= start && tDate <= end;
+            });
+        }
+
+        function calculateFinancials(period) {
+            const filteredTransactions = filterTransactionsByPeriod(period);
+
+            const revenue = filteredTransactions
+                .filter(t => t.type === 'revenue')
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            const expense = filteredTransactions
+                .filter(t => t.type === 'expense')
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            return {
+                revenue,
+                expense,
+                profit: revenue - expense
+            };
+        }
+
+        function formatCurrency(value) {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function updateFinanceUI() {
+            const financials = calculateFinancials(currentPeriod);
+
+            document.getElementById('totalRevenue').textContent = formatCurrency(financials.revenue);
+            document.getElementById('totalExpense').textContent = formatCurrency(financials.expense);
+            document.getElementById('totalProfit').textContent = formatCurrency(financials.profit);
+
+            const profitCard = document.getElementById('totalProfit').parentElement;
+            if (financials.profit < 0) {
+                profitCard.style.background = 'linear-gradient(135deg, #eb3349 0%, #f45c43 100%)';
+            } else {
+                profitCard.style.background = 'linear-gradient(135deg, #4776e6 0%, #8e54e9 100%)';
+            }
+
+            updateTransactionsList();
+        }
+
+        function updateTransactionsList() {
+            const listDiv = document.getElementById('transactionsList');
+            const filteredTransactions = filterTransactionsByPeriod(currentPeriod);
+
+            if (filteredTransactions.length === 0) {
+                listDiv.innerHTML = '<div class="no-data">Nenhuma transação registrada neste período</div>';
+                return;
+            }
+
+            const sortedTransactions = [...filteredTransactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            listDiv.innerHTML = sortedTransactions.slice(0, 20).map(t => `
+                <div class="transaction-item ${t.type}">
+                    <div class="transaction-info">
+                        <div style="font-weight: 600; color: #333;">
+                            ${t.type === 'revenue' ? '💵' : '💸'} ${t.description}
+                        </div>
+                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                            ${new Date(t.date).toLocaleDateString('pt-BR')}
+                            ${t.clientName ? ` • ${t.clientName}` : ''}
+                        </div>
+                    </div>
+                    <div class="transaction-amount ${t.type === 'revenue' ? 'positive' : 'negative'}">
+                        ${t.type === 'revenue' ? '+' : '-'} ${formatCurrency(t.amount)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateSaleClientSelect() {
+            const select = document.getElementById('saleClient');
+            select.innerHTML = '<option value="">Venda avulsa</option>';
+
+            Object.values(clients).forEach(client => {
+                const option = document.createElement('option');
+                option.value = client.id;
+                option.textContent = client.name;
+                select.appendChild(option);
+            });
+        }
+
+        function updateClientsUI() {
+            const select = document.getElementById('deliveryClient');
+            select.innerHTML = '<option value="">Selecione um cliente</option>';
+
+            Object.values(clients).forEach(client => {
+                const option = document.createElement('option');
+                option.value = client.id;
+                option.textContent = client.name;
+                select.appendChild(option);
+            });
+
+            const listDiv = document.getElementById('clientsList');
+            listDiv.innerHTML = '';
+
+            if (Object.keys(clients).length === 0) {
+                listDiv.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Nenhum cliente cadastrado ainda. Comece cadastrando seu primeiro cliente! 🚀</p>';
+                return;
+            }
+
+            Object.values(clients).forEach(async client => {
+                const clientDiv = document.createElement('div');
+                clientDiv.className = 'client-item';
+
+                const clientDeliveries = deliveries[client.id] || [];
+                const deliveryCount = clientDeliveries.length;
+                const avgDays = calculateAverageDays(clientDeliveries);
+                const prediction = predictNextDelivery(clientDeliveries);
+
+                let predictionHTML = '';
+                if (prediction) {
+                    const today = new Date();
+                    const daysUntil = Math.floor((prediction.date - today) / (1000 * 60 * 60 * 24));
+
+                    let alertClass = '';
+                    let alertText = '';
+
+                    if (daysUntil <= 3 && daysUntil >= 0) {
+                        alertClass = 'alert-success';
+                        alertText = `🔔 Cliente deve ser notificado! Próxima entrega prevista em ${daysUntil} dia(s)`;
+                    } else if (daysUntil < 0) {
+                        alertClass = 'alert';
+                        alertText = '⚠️ Entrega atrasada! Cliente pode precisar de galão urgente.';
+                    }
+
+                    if (alertText) {
+                        predictionHTML = `<div class="alert ${alertClass}">${alertText}</div>`;
+                    }
+
+                    predictionHTML += `
+                        <div class="notification">
+                            <strong>📅 Próxima entrega prevista:</strong> ${prediction.date.toLocaleDateString('pt-BR')}<br>
+                            <strong>📊 Baseado em:</strong> ${deliveryCount} entregas anteriores
+                        </div>
+                    `;
+                }
+
+                clientDiv.innerHTML = `
+                    <div class="client-header">
+                        <div>
+                            <div class="client-name">${client.name}</div>
+                            <div class="client-phone">📱 ${client.phone}</div>
+                        </div>
+                        <button class="btn btn-small" onclick="sendWhatsAppMessage('${client.id}')" ${!prediction ? 'disabled' : ''}>
+                            📱 Abrir WhatsApp
+                        </button>
+                    </div>
+                    <div class="client-stats">
+                        <div class="stat">
+                            <div class="stat-label">Entregas Registradas</div>
+                            <div class="stat-value">${deliveryCount}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Média de Consumo</div>
+                            <div class="stat-value">${avgDays ? avgDays + ' dias' : 'Calculando...'}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Status do Sistema</div>
+                            <div class="stat-value">${deliveryCount < 2 ? '🟡 Aprendendo' : '🟢 Ativo'}</div>
+                        </div>
+                    </div>
+                    ${predictionHTML}
+                `;
+
+                listDiv.appendChild(clientDiv);
+            });
+
+            updateSaleClientSelect();
+        }
+
+        // ==========================================
+        // CARREGA DADOS DO FIREBASE
+        // ==========================================
+
+        function loadFirebaseData() {
+            if (!isFirebaseConfigured) return;
+
+            db.ref('clients').on('value', (snapshot) => {
+                clients = snapshot.val() || {};
+                updateClientsUI();
+            });
+
+            db.ref('deliveries').on('value', (snapshot) => {
+                deliveries = snapshot.val() || {};
+                updateClientsUI();
+            });
+
+            db.ref('transactions').on('value', (snapshot) => {
+                const data = snapshot.val() || {};
+                transactions = Object.values(data);
+                updateFinanceUI();
+            });
+
+            console.log('✅ Dados carregados do Firebase!');
+        }
+
+        // Inicializa
+        if (isFirebaseConfigured) {
+            loadFirebaseData();
+        }
+    </script>
+</body>
+
+</html>
