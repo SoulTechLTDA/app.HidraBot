@@ -935,17 +935,30 @@ Responda SIM para confirmar seu pedido! 😊`;
 
             const revenue = filteredTransactions
                 .filter(t => t.type === 'revenue')
-                .reduce((sum, t) => sum + t.amount, 0);
+                .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
             const expense = filteredTransactions
                 .filter(t => t.type === 'expense')
-                .reduce((sum, t) => sum + t.amount, 0);
+                .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-            return {
-                revenue,
-                expense,
-                profit: revenue - expense
-            };
+            const profit = revenue - expense;
+
+            // Salva resumo financeiro no Firebase
+            if (isFirebaseConfigured) {
+                const summary = {
+                    period: period,
+                    revenue: revenue,
+                    expense: expense,
+                    profit: profit,
+                    lastUpdate: new Date().toISOString()
+                };
+                
+                db.ref('financialSummary/' + period).set(summary).catch(err => {
+                    console.error('Erro ao salvar resumo:', err);
+                });
+            }
+
+            return { revenue, expense, profit };
         }
 
         function formatCurrency(value) {
