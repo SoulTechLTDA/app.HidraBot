@@ -504,7 +504,7 @@
                         <label>Descrição</label>
                         <input type="text" id="saleDescription" placeholder="Venda de galão 20L">
                     </div>
-                    <button class="btn" onclick="addSale()">Registrar Venda</button>
+                    <button class="btn" onclick="addSale(); return false;">Registrar Venda</button>
                 </div>
 
                 <div class="card">
@@ -532,7 +532,7 @@
                         <label>Descrição</label>
                         <input type="text" id="expenseDescription" placeholder="Compra de galões">
                     </div>
-                    <button class="btn" onclick="addExpense()">Registrar Custo</button>
+                    <button class="btn" onclick="addExpense(); return false;">Registrar Custo</button>
                 </div>
             </div>
 
@@ -711,6 +711,8 @@
         // ==========================================
 
         async function addSale() {
+            console.log('🔵 Função addSale() chamada');
+
             if (!isFirebaseConfigured) {
                 alert('⚠️ Firebase não conectado!');
                 return;
@@ -720,6 +722,8 @@
             const amount = parseFloat(document.getElementById('saleAmount').value);
             const date = document.getElementById('saleDate').value;
             const description = document.getElementById('saleDescription').value.trim();
+
+            console.log('📊 Dados da venda:', { clientId, amount, date, description });
 
             if (!amount || amount <= 0 || !date) {
                 alert('Por favor, preencha o valor e a data!');
@@ -733,23 +737,29 @@
                 date: new Date(date + 'T12:00:00').toISOString(),
                 description: description || 'Venda',
                 clientId: clientId || null,
-                clientName: clientId ? clients[clientId].name : 'Venda avulsa'
+                clientName: clientId && clients[clientId] ? clients[clientId].name : 'Venda avulsa',
+                timestamp: Date.now()
             };
+
+            console.log('💾 Salvando transação:', transaction);
 
             try {
                 await db.ref('transactions/' + transaction.id).set(transaction);
+                console.log('✅ Venda salva no Firebase!');
 
                 document.getElementById('saleAmount').value = '';
                 document.getElementById('saleDescription').value = '';
 
                 alert('✅ Venda registrada com sucesso!');
             } catch (error) {
-                console.error('Erro:', error);
-                alert('❌ Erro ao registrar venda!');
+                console.error('❌ Erro ao salvar:', error);
+                alert('❌ Erro ao registrar venda: ' + error.message);
             }
         }
 
         async function addExpense() {
+            console.log('🔵 Função addExpense() chamada');
+
             if (!isFirebaseConfigured) {
                 alert('⚠️ Firebase não conectado!');
                 return;
@@ -759,6 +769,8 @@
             const amount = parseFloat(document.getElementById('expenseAmount').value);
             const date = document.getElementById('expenseDate').value;
             const description = document.getElementById('expenseDescription').value.trim();
+
+            console.log('📊 Dados do custo:', { type, amount, date, description });
 
             if (!amount || amount <= 0 || !date) {
                 alert('Por favor, preencha o valor e a data!');
@@ -771,20 +783,61 @@
                 amount: amount,
                 date: new Date(date + 'T12:00:00').toISOString(),
                 description: description || type,
-                expenseType: type
+                expenseType: type,
+                timestamp: Date.now()
             };
+
+            console.log('💾 Salvando custo:', transaction);
 
             try {
                 await db.ref('transactions/' + transaction.id).set(transaction);
+                console.log('✅ Custo salvo no Firebase!');
 
                 document.getElementById('expenseAmount').value = '';
                 document.getElementById('expenseDescription').value = '';
 
                 alert('✅ Custo registrado com sucesso!');
             } catch (error) {
-                console.error('Erro:', error);
-                alert('❌ Erro ao registrar custo!');
+                console.error('❌ Erro ao salvar:', error);
+                alert('❌ Erro ao registrar custo: ' + error.message);
             }
+        }
+
+        if (!isFirebaseConfigured) {
+            alert('⚠️ Firebase não conectado!');
+            return;
+        }
+
+        const type = document.getElementById('expenseType').value;
+        const amount = parseFloat(document.getElementById('expenseAmount').value);
+        const date = document.getElementById('expenseDate').value;
+        const description = document.getElementById('expenseDescription').value.trim();
+
+        if (!amount || amount <= 0 || !date) {
+            alert('Por favor, preencha o valor e a data!');
+            return;
+        }
+
+        const transaction = {
+            id: Date.now().toString(),
+            type: 'expense',
+            amount: amount,
+            date: new Date(date + 'T12:00:00').toISOString(),
+            description: description || type,
+            expenseType: type
+        };
+
+        try {
+            await db.ref('transactions/' + transaction.id).set(transaction);
+
+            document.getElementById('expenseAmount').value = '';
+            document.getElementById('expenseDescription').value = '';
+
+            alert('✅ Custo registrado com sucesso!');
+        } catch (error) {
+            console.error('Erro:', error);
+            alert('❌ Erro ao registrar custo!');
+        }
         }
 
         // ==========================================
@@ -952,7 +1005,7 @@ Responda SIM para confirmar seu pedido! 😊`;
                     profit: profit,
                     lastUpdate: new Date().toISOString()
                 };
-                
+
                 db.ref('financialSummary/' + period).set(summary).catch(err => {
                     console.error('Erro ao salvar resumo:', err);
                 });
